@@ -38,8 +38,18 @@ pd.set_option('display.max_colwidth', text_preview_len)
 # --- Show shapes and columns ---
 print(f"\nPosts shape: {posts.shape}, columns: {posts.columns.tolist()}")
 print(posts.head(10).to_string(index=False))
+# Total missing values per column in posts
+missing_posts = posts.isna().sum()
+print("Missing values per column in posts:")
+print(missing_posts)
+
+# Total missing values per column in comments
+missing_comments = comments.isna().sum()
+print("\nMissing values per column in comments:")
+print(missing_comments)
 
 print(f"\nComments shape: {comments.shape}, columns: {comments.columns.tolist()}")
+
 if "text" in comments.columns:
     print(comments[['post_id','text']].head(10).to_string(index=False))
 
