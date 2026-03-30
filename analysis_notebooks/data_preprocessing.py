@@ -49,7 +49,7 @@ print("\nMissing values per column in comments:")
 print(missing_comments)
 
 print(f"\nComments shape: {comments.shape}, columns: {comments.columns.tolist()}")
-
+print(f"\nposts.shape: {posts.shape}, columns: {posts.columns.tolist()}")
 if "text" in comments.columns:
     print(comments[['post_id','text']].head(10).to_string(index=False))
 
