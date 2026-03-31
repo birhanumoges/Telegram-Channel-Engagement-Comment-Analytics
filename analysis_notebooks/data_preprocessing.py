@@ -2,6 +2,9 @@ from pathlib import Path
 import os
 import pandas as pd
 
+import re
+import emoji
+
 # ================= CONFIG =================
 n_comments = 3           # max number of comments per post
 text_preview_len = 80    # truncate long text for display
@@ -120,13 +123,7 @@ for _, post in posts.head(20).iterrows():
 
 print("\n✅ Data preprocessing completed successfully.")
 
-print("==============other preprocessing steps to consider==============")
-print("\n--- Final DataFrames ---")
-
-import re
-import emoji
-import pandas as pd
-
+#================ other preprocessing steps to consider==============")
 def clean_text(text):
     if not isinstance(text, str):
         return ""
