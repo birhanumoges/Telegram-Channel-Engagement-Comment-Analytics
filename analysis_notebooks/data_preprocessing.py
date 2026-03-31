@@ -13,11 +13,11 @@ except NameError:
     PROJECT_ROOT = Path.cwd()  # fallback if running interactively
 
 # --- Data paths ---
-DEFAULT_DATA_DIR = Path(r"C:\Users\DELL\Documents\project_data\output")
+DEFAULT_DATA_DIR = Path(r"C:/Users/DELL/Documents/project_data/output")
 DATA_DIR = Path(os.getenv("DATA_DIR", DEFAULT_DATA_DIR))
 
-POSTS_PATH = DATA_DIR / "safaricom_telegram.csv"
-COMMENTS_PATH = DATA_DIR / "safaricom_comments.csv"
+POSTS_PATH = DATA_DIR / "safaricom_posts.csv"
+COMMENTS_PATH = DATA_DIR / "safaricom_comments22.csv"
 
 # --- File existence check ---
 print("Using DATA_DIR:", DATA_DIR)
@@ -70,6 +70,23 @@ print(f"\nComments shape: {comments.shape}")
 print("Missing values per column in comments:")
 print(missing_comments)
 print(f"\nPosts with no comments: {no_comment_count}")
+
+# Number of posts with at least 1 comment
+posts_with_comments_count = posts.shape[0] - 2228
+print("Posts with at least 1 comment:", posts_with_comments_count)
+
+# Number of comments per post (summary)
+comments_per_post = comments.groupby('post_id').size()
+print("Comments per post stats:")
+print(comments_per_post.describe())
+
+# Comments whose post_id does not exist in posts
+invalid_post_comments = comments[~comments['post_id'].isin(posts['msg_id'])]
+
+# Total number of such comments
+total_invalid_comments = invalid_post_comments.shape[0]
+
+print(f"Total comments pointing to missing posts: {total_invalid_comments}")
 
 # --- Group comments by post_id for preview ---
 comments_grouped = comments.groupby("post_id")["text"].apply(list).to_dict()
