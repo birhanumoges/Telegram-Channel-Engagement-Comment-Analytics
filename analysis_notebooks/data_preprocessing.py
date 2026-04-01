@@ -235,3 +235,22 @@ plt.show()
 # Correlation
 print(posts[['text_length', 'num_comments']].corr())
 
+#=======================comment level analysis========================
+plt.figure(figsize=(10, 4))
+plt.hist(comments['text_length'], bins=100, edgecolor='black', log=True)
+plt.title('Comment Text Length Distribution (Log Scale)')
+plt.xlabel('Character Count')
+plt.ylabel('Frequency (log scale)')
+plt.show()
+
+# Summary statistics
+print(comments['text_length'].describe())
+
+# Top commenters
+top_commenters = comments['sender_id'].value_counts().head(10)
+print("Top 10 most active commenters:")
+print(top_commenters)
+
+# Average comments per user
+avg_comments_per_user = len(comments) / comments['sender_id'].nunique()
+print(f"Average comments per user: {avg_comments_per_user:.2f}")
