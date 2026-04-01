@@ -177,6 +177,16 @@ posts['has_question'] = posts['cleaned_text'].str.contains('\?').astype(int)
 comments['text_length'] = comments['cleaned_text'].str.len()
 comments['word_count'] = comments['cleaned_text'].str.split().str.len()
 
+print("\n=== AFTER PREPROCESSING ===")
+print(f"Posts shape: {posts.shape}")
+print(f"Comments shape: {comments.shape}")
+print("Missing values per column (posts):")
+print(posts.isna().sum())
+print("Missing values per column (comments):")
+print(comments.isna().sum())
+print(f"\nPosts with no comments: {no_comment_count}")
+print(f"Posts with at least 1 comment: {posts_with_comments_count}")
+print(f"Total comments pointing to missing posts: {total_invalid_comments}")
 
 print("\n✅ Data preprocessing completed successfully.")
 
