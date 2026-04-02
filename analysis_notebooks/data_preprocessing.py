@@ -1,6 +1,10 @@
 from pathlib import Path
 import os
 import pandas as pd
+import matplotlib.pyplot as plt
+import seaborn as sns
+from langdetect import detect, DetectorFactory
+DetectorFactory.seed = 0
 
 import re
 import emoji
@@ -154,10 +158,9 @@ def clean_text(text):
 posts['cleaned_text'] = posts['text'].apply(clean_text)
 comments['cleaned_text'] = comments['text'].apply(clean_text)
 
+#========================= language detection =========================
 # Detect if text is Amharic, English, or mixed
-from langdetect import detect, DetectorFactory
-DetectorFactory.seed = 0
-
+#======================================================================
 def detect_lang(text):
     try:
         return detect(text)
@@ -168,6 +171,7 @@ def detect_lang(text):
 comments_sample = comments['cleaned_text'].head(1000).apply(detect_lang)
 print(comments_sample.value_counts())
 
+#========================= feature engineering =========================
 # For posts
 posts['text_length'] = posts['cleaned_text'].str.len()
 posts['word_count'] = posts['cleaned_text'].str.split().str.len()
@@ -190,13 +194,11 @@ print(f"Total comments pointing to missing posts: {total_invalid_comments}")
 
 print("\n✅ Data preprocessing completed successfully.")
 
-#===================exploratory data analysis steps to consider===================
+#===================  Data analysis steps to consider ===================
 top_posts = posts.nlargest(10, 'num_comments')[['msg_id', 'text', 'num_comments']]
 print("Top 10 posts by comment count:")
 print(top_posts)
 
-import matplotlib.pyplot as plt
-import seaborn as sns
 
 plt.figure(figsize=(12, 5))
 
@@ -235,7 +237,7 @@ plt.show()
 # Correlation
 print(posts[['text_length', 'num_comments']].corr())
 
-#=======================comment level analysis========================
+#======================= Comment level analysis ========================
 plt.figure(figsize=(10, 4))
 plt.hist(comments['text_length'], bins=100, edgecolor='black', log=True)
 plt.title('Comment Text Length Distribution (Log Scale)')
