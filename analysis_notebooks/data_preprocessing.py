@@ -200,83 +200,38 @@ print("Top 10 posts by comment count:")
 print(top_posts)
 
 
-plt.figure(figsize=(12, 5))
+# ================= NUMERICAL ANALYSIS ONLY =================
 
-plt.subplot(1, 2, 1)
-plt.hist(posts['num_comments'], bins=50, edgecolor='black')
-plt.title('Distribution of Comments per Post')
-plt.xlabel('Number of Comments')
-plt.ylabel('Frequency')
+print("=== POST LEVEL ANALYSIS ===\n")
 
-plt.subplot(1, 2, 2)
-plt.boxplot(posts['num_comments'])
-plt.title('Boxplot of Comments per Post')
-plt.ylabel('Number of Comments')
+print("Comments per Post - Summary:")
+print(posts['num_comments'].describe())
 
-plt.tight_layout()
-plt.show()
+print("\nTop 10 Posts with Most Comments:")
+print(posts.nlargest(10, 'num_comments')[['msg_id', 'text_length', 'num_comments']])
 
-# Post text length distribution
-plt.figure(figsize=(12, 4))
+print("\nText Length vs Comments Correlation:")
+print(posts[['text_length', 'num_comments']].corr().round(3))
 
-plt.subplot(1, 2, 1)
-plt.hist(posts['text_length'], bins=30, edgecolor='black')
-plt.title('Post Text Length Distribution')
-plt.xlabel('Character Count')
-plt.ylabel('Frequency')
+print("\n=== COMMENT LEVEL ANALYSIS ===\n")
 
-plt.subplot(1, 2, 2)
-sns.scatterplot(x=posts['text_length'], y=posts['num_comments'])
-plt.title('Text Length vs. Number of Comments')
-plt.xlabel('Post Length (characters)')
-plt.ylabel('Number of Comments')
-
-plt.tight_layout()
-plt.show()
-
-# Correlation
-print(posts[['text_length', 'num_comments']].corr())
-
-#======================= Comment level analysis ========================
-plt.figure(figsize=(10, 4))
-plt.hist(comments['text_length'], bins=100, edgecolor='black', log=True)
-plt.title('Comment Text Length Distribution (Log Scale)')
-plt.xlabel('Character Count')
-plt.ylabel('Frequency (log scale)')
-plt.show()
-
-# Summary statistics
+print("Comment Text Length - Summary:")
 print(comments['text_length'].describe())
 
-# Top commenters
-top_commenters = comments['sender_id'].value_counts().head(10)
-print("Top 10 most active commenters:")
-print(top_commenters)
+print("\nTop 10 Most Active Commenters:")
+print(comments['sender_id'].value_counts().head(10))
 
-# Average comments per user
-avg_comments_per_user = len(comments) / comments['sender_id'].nunique()
-print(f"Average comments per user: {avg_comments_per_user:.2f}")
+print(f"\nAverage comments per user: {len(comments) / comments['sender_id'].nunique():.2f}")
 
-# Convert date_utc to datetime if not already
+# Time Analysis
 comments['date_utc'] = pd.to_datetime(comments['date_utc'])
-posts['date_utc'] = pd.to_datetime(posts['date_utc'])
-
-# Comments by hour of day
 comments['hour'] = comments['date_utc'].dt.hour
-comments['day_of_week'] = comments['date_utc'].dt.dayofweek
+comments['day_of_week'] = comments['date_utc'].dt.day_name()
 
-# Plot comment activity by hour
-plt.figure(figsize=(12, 4))
-plt.subplot(1, 2, 1)
-comments['hour'].value_counts().sort_index().plot(kind='bar')
-plt.title('Comments by Hour of Day')
-plt.xlabel('Hour')
-plt.ylabel('Number of Comments')
+print("\nComments by Hour of Day:")
+print(comments['hour'].value_counts().sort_index())
 
-plt.subplot(1, 2, 2)
-comments['day_of_week'].value_counts().sort_index().plot(kind='bar')
-plt.title('Comments by Day of Week')
-plt.xlabel('Day (0=Monday, 6=Sunday)')
-plt.ylabel('Number of Comments')
-plt.tight_layout()
-plt.show()
+print("\nComments by Day of Week:")
+print(comments['day_of_week'].value_counts())
+
+print("\n✅ Numerical analysis completed.")
