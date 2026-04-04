@@ -161,15 +161,62 @@ comments['cleaned_text'] = comments['text'].apply(clean_text)
 #========================= language detection =========================
 # Detect if text is Amharic, English, or mixed
 #======================================================================
-def detect_lang(text):
-    try:
-        return detect(text)
-    except:
-        return 'unknown'
+import pandas as pd
+import re
 
-# Sample first 1000 comments for language distribution
-comments_sample = comments['cleaned_text'].head(1000).apply(detect_lang)
-print(comments_sample.value_counts())
+def detect_language_simple(text):
+    """
+    Detect language of comment using character ranges
+    Fast and works well for Amharic-English mixed text
+    """
+    if not isinstance(text, str) or len(text.strip()) < 2:
+        return 'unknown/other'
+    
+    text = str(text).strip()
+    
+    # Count Amharic characters (Unicode range: ሀ to ፐ)
+    amharic_chars = re.findall(r'[\u1200-\u137F]', text)
+    amharic_count = len(amharic_chars)
+    
+    # Count English characters (a-z, A-Z)
+    english_chars = re.findall(r'[a-zA-Z]', text)
+    english_count = len(english_chars)
+    
+    # Count total meaningful characters (exclude spaces, punctuation)
+    total_meaningful = amharic_count + english_count
+    
+    if total_meaningful == 0:
+        return 'unknown/other'
+    
+    # Calculate percentages
+    amharic_pct = amharic_count / total_meaningful
+    english_pct = english_count / total_meaningful
+    
+    # Classify based on thresholds
+    if amharic_pct > 0.8:
+        return 'amharic'
+    elif english_pct > 0.8:
+        return 'english'
+    elif amharic_pct > 0.2 and english_pct > 0.2:
+        return 'mixed'
+    else:
+        return 'unknown/other'
+
+# Apply to your data
+comments['language'] = comments['cleaned_text'].apply(detect_language_simple)
+posts['language'] = posts['cleaned_text'].apply(detect_language_simple)
+
+# Get distribution
+lang_distribution = comments['language'].value_counts()
+print("=== LANGUAGE DISTRIBUTION ===")
+print(lang_distribution)
+print(f"\nTotal: {len(comments)} comments")
+
+# Calculate percentages
+print("\n=== PERCENTAGES ===")
+for lang, count in lang_distribution.items():
+    percentage = (count / len(comments)) * 100
+    print(f"{lang:15}: {count:8,} ({percentage:5.2f}%)")
 
 #========================= feature engineering =========================
 # For posts
