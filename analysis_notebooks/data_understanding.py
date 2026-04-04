@@ -1,0 +1,284 @@
+from pathlib import Path
+import os
+import pandas as pd
+import matplotlib.pyplot as plt
+import seaborn as sns
+from langdetect import detect, DetectorFactory
+DetectorFactory.seed = 0
+
+import re
+import emoji
+
+# ================= CONFIG =================
+n_comments = 3           # max number of comments per post
+text_preview_len = 80    # truncate long text for display
+
+# ================= PROJECT ROOT & DATA PATHS =================
+try:
+    PROJECT_ROOT = Path(__file__).resolve().parent
+except NameError:
+    PROJECT_ROOT = Path.cwd()  # fallback if running interactively
+
+DEFAULT_DATA_DIR = Path(r"C:/Users/DELL/Documents/project_data/output")
+DATA_DIR = Path(os.getenv("DATA_DIR", DEFAULT_DATA_DIR))
+
+POSTS_PATH = DATA_DIR / "safaricom_posts.csv"
+COMMENTS_PATH = DATA_DIR / "safaricom_comments22.csv"
+
+# ================= FILE EXISTENCE CHECK =================
+print("Using DATA_DIR:", DATA_DIR)
+if not POSTS_PATH.exists():
+    raise FileNotFoundError(f"Posts file not found: {POSTS_PATH}")
+if not COMMENTS_PATH.exists():
+    raise FileNotFoundError(f"Comments file not found: {COMMENTS_PATH}")
+
+# ================= LOAD CSVs =================
+posts = pd.read_csv(POSTS_PATH)
+comments = pd.read_csv(COMMENTS_PATH)
+
+# ------------------ BEFORE PREPROCESSING ------------------
+print("\n=== BEFORE PREPROCESSING ===")
+print(f"Posts shape: {posts.shape}")
+print(f"Comments shape: {comments.shape}")
+print("\nMissing values per column (posts):")
+print(posts.isna().sum())
+print("\nMissing values per column (comments):")
+print(comments.isna().sum())
+print(f"\nDuplicate posts: {posts.duplicated(subset='msg_id').sum()}")
+print(f"Duplicate comments: {comments.duplicated(subset='comment_id').sum()}")
+
+# Checking data types
+print("\nData types in Posts:")
+print(posts.dtypes)
+print("\nData types in Comments:")
+print(comments.dtypes)
+
+# ================= DEDUPLICATE =================
+posts = posts.drop_duplicates(subset='msg_id')
+comments = comments.drop_duplicates(subset='comment_id')
+
+# ================= FILL MISSING VALUES =================
+posts['views'] = posts['views'].fillna(0)
+posts['forwards'] = posts['forwards'].fillna(0)
+posts['replies'] = posts['replies'].fillna(0)
+posts['media_type'] = posts['media_type'].fillna('Unknown')
+posts['text'] = posts['text'].fillna('<media_only>')
+posts['reply_to_msg_id'] = posts['reply_to_msg_id'].fillna('None')
+
+comments['text'] = comments['text'].fillna('<deleted>')
+comments['sender_id'] = comments['sender_id'].fillna('Unknown')
+
+# ================= ENSURE IDs ARE INTEGERS =================
+posts["msg_id"] = posts["msg_id"].fillna(-1).astype(int)
+comments["post_id"] = comments["post_id"].fillna(-1).astype(int)
+
+# ================= CREATE OR FIX num_comments =================
+if 'num_comments' not in posts.columns:
+    comments_count = comments.groupby('post_id')['comment_id'].count().reset_index()
+    comments_count.rename(columns={'comment_id': 'num_comments'}, inplace=True)
+    posts = posts.merge(comments_count, how='left', left_on='msg_id', right_on='post_id')
+    posts['num_comments'] = posts['num_comments'].fillna(0).astype(int)
+    posts.drop(columns=['post_id'], inplace=True)
+else:
+    # fill missing values in existing column
+    posts['num_comments'] = posts['num_comments'].fillna(0).astype(int)
+
+# ================= DATA QUALITY CHECKS =================
+no_comment_count = (posts['num_comments'] == 0).sum()
+posts_with_comments_count = posts.shape[0] - no_comment_count
+invalid_post_comments = comments[~comments['post_id'].isin(posts['msg_id'])]
+total_invalid_comments = invalid_post_comments.shape[0]
+
+print("\n=== AFTER PREPROCESSING ===")
+print(f"Posts shape: {posts.shape}")
+print(f"Comments shape: {comments.shape}")
+print("Missing values per column (posts):")
+print(posts.isna().sum())
+print("Missing values per column (comments):")
+print(comments.isna().sum())
+print(f"\nPosts with no comments: {no_comment_count}")
+print(f"Posts with at least 1 comment: {posts_with_comments_count}")
+print(f"Total comments pointing to missing posts: {total_invalid_comments}")
+
+# ================= COMMENTS PER POST SUMMARY =================
+comments_per_post = comments.groupby('post_id').size()
+print("\nComments per post stats:")
+print(comments_per_post.describe())
+
+# ================= GROUP COMMENTS BY POST FOR PREVIEW =================
+comments_grouped = comments.groupby("post_id")["text"].apply(list).to_dict()
+
+print("\n--- Preview first 20 posts with comments ---")
+for _, post in posts.head(20).iterrows():
+    post_id = post["msg_id"]
+    post_text = str(post["text"])
+    post_text_short = (post_text[:text_preview_len] + "...") if len(post_text) > text_preview_len else post_text
+    print(f"\nPost ID {post_id} - Text: {post_text_short}")
+
+    post_comments = comments_grouped.get(post_id, [])
+    if not post_comments:
+        print("  No comments.")
+        continue
+
+    for i, comment_text in enumerate(post_comments[:n_comments], start=1):
+        comment_text = str(comment_text)
+        comment_text_short = (comment_text[:text_preview_len] + "...") if len(comment_text) > text_preview_len else comment_text
+        print(f"  Comment {i}: {comment_text_short}")
+
+#================ other preprocessing steps to consider==============")
+def clean_text(text):
+    if not isinstance(text, str):
+        return ""
+    
+    # 1. Remove URLs (links)
+    text = re.sub(r'http\S+|www\S+|https\S+', '', text, flags=re.MULTILINE)
+    
+    # 2. Remove mentions and hashtags (optional - keep if needed for analysis)
+    text = re.sub(r'@\w+', '', text)  # remove @mentions
+    # text = re.sub(r'#\w+', '', text)  # uncomment to remove hashtags
+    
+    # 3. Remove emojis OR convert them to text
+    # Option A: Remove emojis
+    text = emoji.replace_emoji(text, replace='')
+    # Option B: Convert emojis to text (useful for sentiment)
+    # text = emoji.demojize(text, delimiters=(":", ":"))
+    
+    # 4. Remove special characters and digits (keep only letters and spaces)
+    text = re.sub(r'[^a-zA-Z\u1200-\u137F\s]', '', text)  # keeps Amharic and English
+    
+    # 5. Convert to lowercase (if English-heavy, but Amharic doesn't have case)
+    text = text.lower()
+    
+    # 6. Remove extra whitespace
+    text = ' '.join(text.split())
+    
+    return text
+
+# Apply cleaning
+posts['cleaned_text'] = posts['text'].apply(clean_text)
+comments['cleaned_text'] = comments['text'].apply(clean_text)
+
+#========================= language detection =========================
+# Detect if text is Amharic, English, or mixed
+#======================================================================
+import pandas as pd
+import re
+
+def detect_language_simple(text):
+    """
+    Detect language of comment using character ranges
+    Fast and works well for Amharic-English mixed text
+    """
+    if not isinstance(text, str) or len(text.strip()) < 2:
+        return 'unknown/other'
+    
+    text = str(text).strip()
+    
+    # Count Amharic characters (Unicode range: ሀ to ፐ)
+    amharic_chars = re.findall(r'[\u1200-\u137F]', text)
+    amharic_count = len(amharic_chars)
+    
+    # Count English characters (a-z, A-Z)
+    english_chars = re.findall(r'[a-zA-Z]', text)
+    english_count = len(english_chars)
+    
+    # Count total meaningful characters (exclude spaces, punctuation)
+    total_meaningful = amharic_count + english_count
+    
+    if total_meaningful == 0:
+        return 'unknown/other'
+    
+    # Calculate percentages
+    amharic_pct = amharic_count / total_meaningful
+    english_pct = english_count / total_meaningful
+    
+    # Classify based on thresholds
+    if amharic_pct > 0.8:
+        return 'amharic'
+    elif english_pct > 0.8:
+        return 'english'
+    elif amharic_pct > 0.2 and english_pct > 0.2:
+        return 'mixed'
+    else:
+        return 'unknown/other'
+
+# Apply to your data
+comments['language'] = comments['cleaned_text'].apply(detect_language_simple)
+posts['language'] = posts['cleaned_text'].apply(detect_language_simple)
+
+# Get distribution
+lang_distribution = comments['language'].value_counts()
+print("=== LANGUAGE DISTRIBUTION ===")
+print(lang_distribution)
+print(f"\nTotal: {len(comments)} comments")
+
+# Calculate percentages
+print("\n=== PERCENTAGES ===")
+for lang, count in lang_distribution.items():
+    percentage = (count / len(comments)) * 100
+    print(f"{lang:15}: {count:8,} ({percentage:5.2f}%)")
+
+#========================= feature engineering =========================
+# For posts
+posts['text_length'] = posts['cleaned_text'].str.len()
+posts['word_count'] = posts['cleaned_text'].str.split().str.len()
+posts['has_question'] = posts['cleaned_text'].str.contains('\?').astype(int)
+
+# For comments
+comments['text_length'] = comments['cleaned_text'].str.len()
+comments['word_count'] = comments['cleaned_text'].str.split().str.len()
+
+print("\n=== AFTER PREPROCESSING ===")
+print(f"Posts shape: {posts.shape}")
+print(f"Comments shape: {comments.shape}")
+print("Missing values per column (posts):")
+print(posts.isna().sum())
+print("Missing values per column (comments):")
+print(comments.isna().sum())
+print(f"\nPosts with no comments: {no_comment_count}")
+print(f"Posts with at least 1 comment: {posts_with_comments_count}")
+print(f"Total comments pointing to missing posts: {total_invalid_comments}")
+
+print("\n✅ Data preprocessing completed successfully.")
+
+#===================  Data analysis steps to consider ===================
+top_posts = posts.nlargest(10, 'num_comments')[['msg_id', 'text', 'num_comments']]
+print("Top 10 posts by comment count:")
+print(top_posts)
+
+
+# ================= NUMERICAL ANALYSIS ONLY =================
+
+print("=== POST LEVEL ANALYSIS ===\n")
+
+print("Comments per Post - Summary:")
+print(posts['num_comments'].describe())
+
+print("\nTop 10 Posts with Most Comments:")
+print(posts.nlargest(10, 'num_comments')[['msg_id', 'text_length', 'num_comments']])
+
+print("\nText Length vs Comments Correlation:")
+print(posts[['text_length', 'num_comments']].corr().round(3))
+
+print("\n=== COMMENT LEVEL ANALYSIS ===\n")
+
+print("Comment Text Length - Summary:")
+print(comments['text_length'].describe())
+
+print("\nTop 10 Most Active Commenters:")
+print(comments['sender_id'].value_counts().head(10))
+
+print(f"\nAverage comments per user: {len(comments) / comments['sender_id'].nunique():.2f}")
+
+# Time Analysis
+comments['date_utc'] = pd.to_datetime(comments['date_utc'])
+comments['hour'] = comments['date_utc'].dt.hour
+comments['day_of_week'] = comments['date_utc'].dt.day_name()
+
+print("\nComments by Hour of Day:")
+print(comments['hour'].value_counts().sort_index())
+
+print("\nComments by Day of Week:")
+print(comments['day_of_week'].value_counts())
+
+print("\n✅ Numerical analysis completed.")
